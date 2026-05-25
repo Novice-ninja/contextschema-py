@@ -124,6 +124,57 @@ flowchart TB
 | Langfuse / Braintrust / Phoenix / OpenTelemetry | Export or attach the evidence record after validation; ContextSchema is not an observability backend. |
 | Agent scaffolds and internal platforms | Use it as a plain Python pre-action gate because it has no runtime dependencies. |
 
+## Multi-Decision Agents
+
+A super-agent that handles many decision types should usually use multiple
+schemas, not one giant schema.
+
+For example, a merchandising agent may:
+
+- recommend markdowns
+- recommend price changes
+- suggest store-to-store inventory transfers
+- answer root-cause questions
+
+Each decision has a different validity contract. Markdown decisions may require
+margin guardrails and pricing policy. Store-transfer decisions may require
+source-store inventory, destination-store demand, replenishment state, and
+transfer constraints. Root-cause analysis may allow a qualified answer when
+competitor pricing is missing, while automated action should hard-gate.
+
+Use `DecisionRegistry` and `SchemaRouter` to make that routing explicit:
+
+```python
+from contextschema import DecisionRegistry, SchemaRouter
+
+registry = DecisionRegistry(
+    {
+        "markdown": MarkdownDecision,
+        "store_transfer": StoreTransferDecision,
+        "root_cause": RootCauseDecision,
+    }
+)
+router = SchemaRouter(registry)
+
+result = router.validate(
+    decision_type,
+    retrieved_items,
+    decision_id="agent-run-123",
+    events=events,
+)
+```
+
+Pattern:
+
+```text
+agent intent / decision type
+-> selected ContextSchema
+-> context validity check
+-> proceed | soft_flag | retry_recommended | hard_gate
+```
+
+See `examples/merchandising_super_agent_router.py` for a runnable example.
+
 ## Installation
 
 From this repository:
@@ -248,6 +299,8 @@ longer valid for the buy decision.
 | `RetrievedItem` | Normalized retrieved context item with `id`, optional `text`, and metadata. |
 | `EventRecord` | Business or system event that may invalidate context after retrieval. |
 | `ActionPolicy` | Maps field/schema confidence into `proceed`, `soft_flag`, `retry_recommended`, or `hard_gate`. |
+| `DecisionRegistry` | Registers multiple `ContextSchema` subclasses by decision type for multi-capability agents. |
+| `SchemaRouter` | Routes validation to the schema registered for a decision type. |
 | `ValidationResult` | Top-level result with field confidence, schema confidence, action, warnings, retry recommendations, and evidence. |
 | `FieldConfidence` | Per-field score, status, component factors, reasons, matched item IDs, source refs, timestamps, invalidating events. |
 | `SchemaConfidence` | Whole-decision score, aggregation method, weakest fields, missing required fields, event-invalidated fields. |
@@ -295,6 +348,7 @@ may act on stale, incomplete, or invalidated context.
 | --- | --- |
 | Customer service refund decision | `examples/customer_service_refund.py` |
 | Coding agent code-change decision | `examples/coding_agent_change.py` |
+| Merchandising super-agent schema router | `examples/merchandising_super_agent_router.py` |
 | Sales opportunity next step | `examples/sales_opportunity_next_step.py` |
 | Procurement vendor onboarding | `examples/procurement_vendor_onboarding.py` |
 | Finance invoice approval | `examples/finance_invoice_approval.py` |

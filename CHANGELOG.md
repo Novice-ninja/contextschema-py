@@ -20,6 +20,9 @@ state of the public GitHub repository rather than a PyPI package.
 - Expanded the guide to cover provenance, relevance, timeliness, retrieval
   metadata requirements, and why prompts alone are a weak enforcement layer for
   consequential decisions.
+- `DecisionRegistry` and `SchemaRouter` for routing multi-capability agents to
+  different context schemas by decision type.
+- Merchandising super-agent router example and docs.
 
 ## 0.0.1 - Pre-Release
 

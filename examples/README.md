@@ -12,6 +12,7 @@ complete, and reliable enough before an agent takes the next action.
 | --- | --- | --- |
 | `customer_service_refund.py` | Can a support agent offer a refund? | `hard_gate` because order status evidence was invalidated. |
 | `coding_agent_change.py` | Can a coding agent proceed with a code edit? | `hard_gate` because failing-test evidence was invalidated. |
+| `merchandising_super_agent_router.py` | Can one merchandising agent route markdown and transfer decisions to different schemas? | Markdown `hard_gate`; transfer `proceed`. |
 | `sales_opportunity_next_step.py` | Can a sales agent recommend the next commercial action? | `hard_gate` because pricing guidance was invalidated. |
 | `procurement_vendor_onboarding.py` | Can procurement approve vendor onboarding? | `hard_gate` because sanctions screening was invalidated. |
 | `finance_invoice_approval.py` | Can finance approve an invoice for payment? | `hard_gate` because PO-match evidence was invalidated. |
@@ -32,6 +33,7 @@ Run one example:
 ```bash
 PYTHONPATH=src python3 examples/customer_service_refund.py
 PYTHONPATH=src python3 examples/coding_agent_change.py
+PYTHONPATH=src python3 examples/merchandising_super_agent_router.py
 ```
 
 ## Customer Service Refund
@@ -82,3 +84,26 @@ Action: hard_gate
 The example hard-gates because a `ci_status_changed` event occurred after the
 test-status evidence was retrieved. A real coding agent would refresh CI/test
 context before proceeding with the code change.
+
+## Merchandising Super-Agent Router
+
+`merchandising_super_agent_router.py` models one agent that can validate
+different merchandising decision types with different schemas.
+
+Assumptions:
+
+- Markdown recommendations need sales, price, and margin guardrail context.
+- Store-transfer recommendations need source inventory, destination demand, and
+  transfer constraints.
+- One giant schema would over-gate some decisions and under-gate others.
+
+Expected result:
+
+```text
+markdown hard_gate ['margin_guardrail']
+store_transfer proceed 1.0
+```
+
+The markdown path hard-gates because margin guardrails are missing. The
+store-transfer path proceeds because its own decision-specific fields are
+present and fresh.

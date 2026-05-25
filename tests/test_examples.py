@@ -67,6 +67,15 @@ class TestExamples(unittest.TestCase):
         self.assertEqual(result.action, "hard_gate")
         self.assertEqual(result.field("manager_approval").status, "event_invalidated")
 
+    def test_merchandising_super_agent_router_example(self) -> None:
+        module = load_example("merchandising_super_agent_router")
+        results = module.run()
+
+        self.assertEqual(results["markdown"].action, "hard_gate")
+        self.assertEqual(results["markdown"].schema_confidence.required_missing, ["margin_guardrail"])
+        self.assertEqual(results["store_transfer"].action, "proceed")
+        self.assertIn("markdown", results["schema_definitions"])
+
 
 if __name__ == "__main__":
     unittest.main()

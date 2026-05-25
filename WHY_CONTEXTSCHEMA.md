@@ -282,6 +282,47 @@ what "enough context" means for a business decision. An engineer can encode it
 as fields, relevance hints, TTLs, sources, source refs, invalidation events,
 and action policy.
 
+## Multi-Decision Agents Need Multiple Contracts
+
+A broad agent often performs more than one kind of decision. That does not mean
+it should use one broad ContextSchema.
+
+For example, a merchandising super-agent may:
+
+- recommend markdown action
+- recommend pricing action
+- suggest store-to-store inventory transfers
+- answer root-cause questions
+- answer descriptive data questions
+
+Those are different decision types with different context validity needs.
+
+| Decision Type | Context That May Be Required |
+| --- | --- |
+| Markdown recommendation | Sales trend, inventory, current price, promo status, margin guardrail, markdown policy, competitor price. |
+| Store transfer | Source-store inventory, destination demand, transfer constraints, inbound supply, logistics feasibility. |
+| Root-cause analysis | Sales trend, inventory/stockout signal, price and promo changes, exception events, traffic/conversion, competitor price when available. |
+| Descriptive answer | The specific metric, dimension, time period, and source freshness needed to answer the question. |
+
+The right pattern is:
+
+```text
+agent intent / decision type
+-> select the matching ContextSchema
+-> validate retrieved context
+-> proceed, qualify, retry, or hard-gate
+```
+
+This matters because the same missing field can mean different things for
+different decisions. Missing competitor pricing may only qualify a root-cause
+hypothesis, but missing margin guardrails should block a markdown-depth
+recommendation. Missing transfer constraints may be irrelevant to pricing, but
+action-blocking for store-to-store transfer.
+
+ContextSchema includes `DecisionRegistry` and `SchemaRouter` for this pattern.
+They make schema selection explicit instead of burying the decision contract in
+agent prompt text or ad hoc branching code.
+
 ## Why Not Just Put This In The Prompt?
 
 This is a fair concern. Some of the ContextSchema discipline can and should

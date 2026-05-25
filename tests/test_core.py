@@ -9,8 +9,10 @@ from contextschema import (
     ContextSchema,
     ContextSchemaError,
     DecisionEvidenceLog,
+    DecisionRegistry,
     EventRecord,
     RetrievedItem,
+    SchemaRouter,
     explain_evidence,
     load_events_jsonl,
 )
@@ -107,6 +109,60 @@ class MetadataPenaltyDecision(ContextSchema):
     required_metadata = ContextField(
         source="trusted_source",
         ttl=timedelta(minutes=5),
+        criticality=1.0,
+        required=True,
+    )
+
+
+class MarkdownDecision(ContextSchema):
+    schema_version = "test-router"
+    action_policy = ActionPolicy(hard_gate_on_missing_required=True)
+
+    sales_trend = ContextField(
+        source="sales_mart",
+        ttl=timedelta(hours=2),
+        criticality=1.0,
+        required=True,
+    )
+    current_price = ContextField(
+        source="pricing_api",
+        ttl=timedelta(hours=1),
+        criticality=1.0,
+        required=True,
+    )
+    margin_guardrail = ContextField(
+        source="pricing_policy",
+        ttl=timedelta(days=1),
+        criticality=1.0,
+        required=True,
+    )
+    competitor_price = ContextField(
+        source="competitor_feed",
+        ttl=timedelta(hours=12),
+        criticality=0.4,
+        required=False,
+    )
+
+
+class StoreTransferDecision(ContextSchema):
+    schema_version = "test-router"
+    action_policy = ActionPolicy(hard_gate_on_missing_required=True)
+
+    source_store_inventory = ContextField(
+        source="inventory_api",
+        ttl=timedelta(minutes=30),
+        criticality=1.0,
+        required=True,
+    )
+    destination_store_demand = ContextField(
+        source="demand_forecast",
+        ttl=timedelta(hours=4),
+        criticality=1.0,
+        required=True,
+    )
+    transfer_constraints = ContextField(
+        source="transfer_rules",
+        ttl=timedelta(days=7),
         criticality=1.0,
         required=True,
     )
@@ -525,6 +581,102 @@ class TestContextSchemaCore(unittest.TestCase):
 
         self.assertEqual(event.affected_fields, ["order_status"])
         self.assertEqual(event.affected_sources, ["orders_api"])
+
+    def test_decision_registry_routes_to_decision_specific_schema(self) -> None:
+        registry = DecisionRegistry(
+            {
+                "markdown": MarkdownDecision,
+                "store_transfer": StoreTransferDecision,
+            }
+        )
+        router = SchemaRouter(registry)
+        evaluated_at = datetime(2026, 5, 25, 16, 5, tzinfo=UTC)
+
+        markdown_result = router.validate(
+            "markdown",
+            [
+                RetrievedItem(
+                    id="sales-1",
+                    metadata={
+                        "context_field": "sales_trend",
+                        "source": "sales_mart",
+                        "source_ref": "sales:SKU-1:week-21",
+                        "valid_at": "2026-05-25T16:05:00Z",
+                    },
+                ),
+                RetrievedItem(
+                    id="price-1",
+                    metadata={
+                        "context_field": "current_price",
+                        "source": "pricing_api",
+                        "source_ref": "price:SKU-1",
+                        "valid_at": "2026-05-25T16:05:00Z",
+                    },
+                ),
+            ],
+            decision_id="markdown-1",
+            evaluated_at=evaluated_at,
+        )
+
+        transfer_result = router.validate(
+            "store_transfer",
+            [
+                RetrievedItem(
+                    id="source-inv-1",
+                    metadata={
+                        "context_field": "source_store_inventory",
+                        "source": "inventory_api",
+                        "source_ref": "inventory:store-1:SKU-1",
+                        "valid_at": "2026-05-25T16:05:00Z",
+                    },
+                ),
+                RetrievedItem(
+                    id="demand-1",
+                    metadata={
+                        "context_field": "destination_store_demand",
+                        "source": "demand_forecast",
+                        "source_ref": "forecast:store-2:SKU-1",
+                        "valid_at": "2026-05-25T16:05:00Z",
+                    },
+                ),
+                RetrievedItem(
+                    id="rules-1",
+                    metadata={
+                        "context_field": "transfer_constraints",
+                        "source": "transfer_rules",
+                        "source_ref": "transfer-rules:standard",
+                        "valid_at": "2026-05-25T16:05:00Z",
+                    },
+                ),
+            ],
+            decision_id="transfer-1",
+            evaluated_at=evaluated_at,
+        )
+
+        self.assertEqual(markdown_result.schema_name, "MarkdownDecision")
+        self.assertEqual(markdown_result.action, "hard_gate")
+        self.assertEqual(markdown_result.schema_confidence.required_missing, ["margin_guardrail"])
+        self.assertEqual(transfer_result.schema_name, "StoreTransferDecision")
+        self.assertEqual(transfer_result.action, "proceed")
+        self.assertEqual(router.route("markdown"), MarkdownDecision)
+        self.assertEqual(registry.decision_types(), ("markdown", "store_transfer"))
+        self.assertIn("store_transfer", router.schema_definitions())
+
+    def test_decision_registry_rejects_unknown_duplicate_and_invalid_schemas(self) -> None:
+        registry = DecisionRegistry()
+        registry.register("markdown", MarkdownDecision)
+
+        with self.assertRaises(ContextSchemaError):
+            registry.register("markdown", MarkdownDecision)
+
+        with self.assertRaises(ContextSchemaError):
+            registry.require("unknown")
+
+        with self.assertRaises(ContextSchemaError):
+            registry.register("empty", EmptyDecision)
+
+        registry.register("markdown", StoreTransferDecision, replace=True)
+        self.assertEqual(registry.require("markdown"), StoreTransferDecision)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import json
 from pathlib import Path
+from collections.abc import Iterator, Mapping
 from typing import Any, ClassVar, Literal
 
 
@@ -570,6 +571,130 @@ class ContextSchema:
         return cls.schema_name or cls.__name__
 
 
+class DecisionRegistry:
+    """Named registry of schemas for agents that handle multiple decision types.
+
+    Use one `ContextSchema` subclass per decision/action class, then register
+    those schemas under stable decision-type names such as `"markdown"`,
+    `"store_transfer"`, or `"root_cause"`.
+    """
+
+    def __init__(self, schemas: Mapping[str, type[ContextSchema]] | None = None):
+        self._schemas: dict[str, type[ContextSchema]] = {}
+        for decision_type, schema in (schemas or {}).items():
+            self.register(decision_type, schema)
+
+    def __contains__(self, decision_type: object) -> bool:
+        return decision_type in self._schemas
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._schemas)
+
+    def __len__(self) -> int:
+        return len(self._schemas)
+
+    def register(
+        self,
+        decision_type: str,
+        schema: type[ContextSchema],
+        *,
+        replace: bool = False,
+    ) -> "DecisionRegistry":
+        """Register a schema class for a decision type.
+
+        By default, duplicate decision types raise `ContextSchemaError`.
+        Pass `replace=True` to intentionally update an existing registration.
+        """
+
+        normalized = _normalize_decision_type(decision_type)
+        _validate_schema_class(schema)
+        if normalized in self._schemas and not replace:
+            raise ContextSchemaError(f"Decision type already registered: {normalized}")
+        self._schemas[normalized] = schema
+        return self
+
+    def unregister(self, decision_type: str) -> type[ContextSchema]:
+        """Remove and return the schema registered for a decision type."""
+
+        normalized = _normalize_decision_type(decision_type)
+        try:
+            return self._schemas.pop(normalized)
+        except KeyError:
+            raise ContextSchemaError(f"Unknown decision type: {normalized}") from None
+
+    def get(self, decision_type: str) -> type[ContextSchema] | None:
+        """Return the schema for a decision type, or `None` if not registered."""
+
+        return self._schemas.get(_normalize_decision_type(decision_type))
+
+    def require(self, decision_type: str) -> type[ContextSchema]:
+        """Return the schema for a decision type or raise `ContextSchemaError`."""
+
+        normalized = _normalize_decision_type(decision_type)
+        schema = self._schemas.get(normalized)
+        if schema is None:
+            available = ", ".join(self.decision_types()) or "none"
+            raise ContextSchemaError(f"Unknown decision type: {normalized}. Available decision types: {available}")
+        return schema
+
+    def decision_types(self) -> tuple[str, ...]:
+        """Return registered decision types in registration order."""
+
+        return tuple(self._schemas)
+
+    def schema_definitions(self) -> dict[str, dict[str, Any]]:
+        """Return JSON-compatible definitions for all registered schemas."""
+
+        return {
+            decision_type: schema.schema_definition()
+            for decision_type, schema in self._schemas.items()
+        }
+
+
+class SchemaRouter:
+    """Route validation to the schema registered for a decision type."""
+
+    def __init__(self, registry: DecisionRegistry | Mapping[str, type[ContextSchema]]):
+        self.registry = registry if isinstance(registry, DecisionRegistry) else DecisionRegistry(registry)
+
+    def route(self, decision_type: str) -> type[ContextSchema]:
+        """Return the schema class registered for `decision_type`."""
+
+        return self.registry.require(decision_type)
+
+    def validate(
+        self,
+        decision_type: str,
+        items: list[RetrievedItem],
+        *,
+        decision_id: str,
+        events: list[EventRecord] | None = None,
+        evaluated_at: datetime | None = None,
+        context: dict[str, Any] | None = None,
+        source_reliability: dict[str, float] | None = None,
+        evidence_log: DecisionEvidenceLog | str | Path | None = None,
+        store_raw_text: bool = False,
+    ) -> ValidationResult:
+        """Validate retrieved context using the schema for `decision_type`."""
+
+        schema = self.route(decision_type)
+        return schema.validate_retrieved(
+            items,
+            decision_id=decision_id,
+            events=events,
+            evaluated_at=evaluated_at,
+            context=context,
+            source_reliability=source_reliability,
+            evidence_log=evidence_log,
+            store_raw_text=store_raw_text,
+        )
+
+    def schema_definitions(self) -> dict[str, dict[str, Any]]:
+        """Return schema definitions keyed by registered decision type."""
+
+        return self.registry.schema_definitions()
+
+
 def load_events_jsonl(path: str | Path, *, strict: bool = True) -> list[EventRecord]:
     """Load invalidation events from JSONL.
 
@@ -1064,6 +1189,22 @@ def _metadata_completeness_score(item: RetrievedItem) -> int:
     score += int(bool(metadata.get("provenance_ref")))
     score += int(_evidence_timestamp(metadata)[1] is not None)
     return score
+
+
+def _normalize_decision_type(decision_type: str) -> str:
+    if not isinstance(decision_type, str):
+        raise ContextSchemaError("decision_type must be a string")
+    normalized = decision_type.strip()
+    if not normalized:
+        raise ContextSchemaError("decision_type is required")
+    return normalized
+
+
+def _validate_schema_class(schema: type[ContextSchema]) -> None:
+    if not isinstance(schema, type) or not issubclass(schema, ContextSchema) or schema is ContextSchema:
+        raise ContextSchemaError("schema must be a ContextSchema subclass")
+    if not schema.fields():
+        raise ContextSchemaError("registered schemas must define at least one ContextField")
 
 
 def _evidence_timestamp(metadata: dict[str, Any]) -> tuple[str | None, datetime | None]:
