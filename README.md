@@ -1,6 +1,8 @@
 # ContextSchema
 
-Decision-scoped context validity for AI agents.
+Validate retrieved context before AI agents act.
+
+[![Tests](https://github.com/Novice-ninja/contextschema-py/actions/workflows/test.yml/badge.svg)](https://github.com/Novice-ninja/contextschema-py/actions/workflows/test.yml)
 
 > Experimental pre-0.1 project. The core API is usable for examples and early
 > review, but public API stability, package publishing, and integrations are
@@ -17,6 +19,31 @@ retriever / memory / tool output -> ContextSchema -> proceed | soft_flag | retry
 ```
 
 No runtime dependencies are required.
+
+## At A Glance
+
+| Question | Short Answer |
+| --- | --- |
+| What problem does it solve? | Retrieved context can be stale, incomplete, weakly sourced, or invalidated before an agent acts. |
+| Where does it run? | After retrieval/tool output, before action/tool execution. |
+| What does it return? | Field confidence, schema confidence, reasons, evidence, and an action recommendation. |
+| What does it depend on? | Nothing at runtime. It accepts plain Python objects. |
+| Does it replace my agent framework? | No. It is a small validation layer you call from your existing workflow. |
+
+## Where It Fits
+
+```mermaid
+flowchart LR
+    A[Retriever, memory, or tool output] --> B[RetrievedItem metadata]
+    B --> C[ContextSchema]
+    D[EventRecord invalidations] --> C
+    E[TTLs, sources, reliability] --> C
+    C --> F{ActionPolicy}
+    F --> G[proceed]
+    F --> H[soft_flag]
+    F --> I[retry_recommended]
+    F --> J[hard_gate]
+```
 
 ## What This Is
 
@@ -40,6 +67,53 @@ No runtime dependencies are required.
 Those systems can feed or consume ContextSchema. The core library only answers:
 
 > Is this retrieved context valid enough for this decision right now?
+
+## Who Should Use This
+
+Use ContextSchema if you are building:
+
+- AI agents that take actions based on retrieved documents, memory, or tool output.
+- RAG applications where stale or weakly sourced context can cause bad decisions.
+- Customer-service, coding, finance, procurement, HR, sales, security, or ops agents
+  that need a pre-action validity check.
+- Evaluation or observability pipelines that need a compact, replayable evidence
+  record for why an agent proceeded, retried, soft-flagged, or stopped.
+
+You probably do not need it if your app only summarizes text, chats over static
+documents, or never lets an agent take consequential actions.
+
+## When To Use It
+
+| Use ContextSchema When | Use Something Else When |
+| --- | --- |
+| You already have retrieved context and need to decide whether it is safe enough to act on. | You need to retrieve, rank, embed, or store documents. |
+| Context freshness, provenance, or event invalidation affects the decision. | You only need output moderation or prompt guardrails. |
+| You want deterministic reasons and evidence before an action runs. | You need a full tracing, dashboarding, or eval platform. |
+| You want a small Python core that can sit inside an existing stack. | You want an end-to-end agent framework. |
+
+## Compatibility With Existing Tools
+
+ContextSchema is designed to be called from other systems, not to replace them.
+
+```mermaid
+flowchart TB
+    R[Retrievers and memory systems] --> CS[ContextSchema validation]
+    C[Data catalogs and freshness checks] --> CS
+    EV[Business or system events] --> CS
+    CS --> O[Agent orchestrators]
+    CS --> P[Policy engines]
+    CS --> T[Tracing and eval tools]
+```
+
+| Tool Category | How It Fits |
+| --- | --- |
+| LangChain / LangGraph | Call `validate_retrieved()` in middleware, before a tool call, or before committing an agent action. |
+| LlamaIndex | Validate retrieved nodes/documents after retrieval and before response synthesis or tool execution. |
+| Redis / Zep / Mem0 | Treat memory or context-engine output as upstream context; pass timestamps, source refs, and reliability through metadata. |
+| dbt / Great Expectations / Tecton / Feast | Use freshness, feature, or data-quality metadata as input signals for context fields. |
+| OPA / Cedar / custom policy | Feed `result.to_policy_input()` into a policy layer if you want external allow/deny rules. |
+| Langfuse / Braintrust / Phoenix / OpenTelemetry | Export or attach the evidence record after validation; ContextSchema is not an observability backend. |
+| Agent scaffolds and internal platforms | Use it as a plain Python pre-action gate because it has no runtime dependencies. |
 
 ## Installation
 

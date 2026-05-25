@@ -13,6 +13,8 @@ state of the public GitHub repository rather than a PyPI package.
   GitHub issue templates.
 - Explicit release-path decision: public GitHub first; PyPI deferred until a
   tagged `0.1.0` release candidate.
+- README sections for intended users, when to use ContextSchema, compatibility
+  with adjacent tools, and visual flow diagrams.
 
 ## 0.0.1 - Pre-Release
 
