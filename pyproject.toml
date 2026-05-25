@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contextschema"
+version = "0.0.1"
+description = "Decision-scoped context validity for AI agents."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "ContextSchema contributors" },
+  { name = "Nirav" }
+]
+maintainers = [
+  { name = "ContextSchema maintainers" }
+]
+license = { text = "MIT" }
+keywords = [
+  "ai-agents",
+  "context",
+  "validation",
+  "rag",
+  "provenance",
+  "freshness",
+  "agent-safety",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Novice-ninja/contextschema-py"
+Repository = "https://github.com/Novice-ninja/contextschema-py"
+Issues = "https://github.com/Novice-ninja/contextschema-py/issues"
+Research = "https://github.com/Novice-ninja/contextschema-py/blob/main/RESEARCH.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+contextschema = ["py.typed"]
