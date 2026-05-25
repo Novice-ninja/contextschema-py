@@ -15,6 +15,8 @@ state of the public GitHub repository rather than a PyPI package.
   tagged `0.1.0` release candidate.
 - README sections for intended users, when to use ContextSchema, compatibility
   with adjacent tools, and visual flow diagrams.
+- `WHY_CONTEXTSCHEMA.md`, a scenario-driven guide for PMs and engineers
+  evaluating context sufficiency as a design-time contract.
 
 ## 0.0.1 - Pre-Release
 

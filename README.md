@@ -12,6 +12,10 @@ ContextSchema is a small Python library for checking whether retrieved context i
 fresh, provenance-backed, event-valid, source-appropriate, and complete enough
 for a specific decision before an agent acts.
 
+It is also a design-time contract: it forces PMs and engineers to declare what
+context is enough, expected, stale, or unusable for a decision, instead of
+assuming the agent will always receive perfect context.
+
 It sits after retrieval and before action:
 
 ```text
@@ -25,6 +29,7 @@ No runtime dependencies are required.
 | Question | Short Answer |
 | --- | --- |
 | What problem does it solve? | Retrieved context can be stale, incomplete, weakly sourced, or invalidated before an agent acts. |
+| What design habit does it enforce? | Declare the context sufficiency boundary before relying on agent recommendations. |
 | Where does it run? | After retrieval/tool output, before action/tool execution. |
 | What does it return? | Field confidence, schema confidence, reasons, evidence, and an action recommendation. |
 | What does it depend on? | Nothing at runtime. It accepts plain Python objects. |
@@ -81,6 +86,10 @@ Use ContextSchema if you are building:
 
 You probably do not need it if your app only summarizes text, chats over static
 documents, or never lets an agent take consequential actions.
+
+For a scenario-driven explanation, including retail merchandising, customer
+service, coding agents, finance, procurement, and security examples, see
+[WHY_CONTEXTSCHEMA.md](WHY_CONTEXTSCHEMA.md).
 
 ## When To Use It
 
