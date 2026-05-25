@@ -87,8 +87,8 @@ Use ContextSchema if you are building:
 You probably do not need it if your app only summarizes text, chats over static
 documents, or never lets an agent take consequential actions.
 
-For a scenario-driven explanation, including retail merchandising, customer
-service, coding agents, finance, procurement, and security examples, see
+For a scenario-driven explanation of context sufficiency, provenance, relevance,
+timeliness, retrieval metadata, and prompt-vs-contract tradeoffs, see
 [WHY_CONTEXTSCHEMA.md](WHY_CONTEXTSCHEMA.md).
 
 ## When To Use It

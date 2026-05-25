@@ -17,6 +17,9 @@ state of the public GitHub repository rather than a PyPI package.
   with adjacent tools, and visual flow diagrams.
 - `WHY_CONTEXTSCHEMA.md`, a scenario-driven guide for PMs and engineers
   evaluating context sufficiency as a design-time contract.
+- Expanded the guide to cover provenance, relevance, timeliness, retrieval
+  metadata requirements, and why prompts alone are a weak enforcement layer for
+  consequential decisions.
 
 ## 0.0.1 - Pre-Release
 
